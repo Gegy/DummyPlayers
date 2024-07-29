@@ -1,36 +1,32 @@
 package com.tterrag.dummyplayers.entity;
 
-import java.util.function.Supplier;
-
+import com.tterrag.dummyplayers.DummyPlayers;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import net.minecraftforge.network.NetworkEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-public class UpdateDummyTexturesMessage {
+public record UpdateDummyTexturesMessage(int id) implements CustomPacketPayload {
+	public static final StreamCodec<ByteBuf, UpdateDummyTexturesMessage> STREAM_CODEC = StreamCodec.composite(
+			ByteBufCodecs.VAR_INT, UpdateDummyTexturesMessage::id,
+			UpdateDummyTexturesMessage::new
+	);
 
-	private final int id;
+	public static final Type<UpdateDummyTexturesMessage> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(DummyPlayers.MODID, "update_dummy_textures"));
 
-	public UpdateDummyTexturesMessage(int id) {
-		this.id = id;
+	public static void handle(UpdateDummyTexturesMessage message, IPayloadContext ctx) {
+		Entity entity = Minecraft.getInstance().level.getEntity(message.id);
+		if (entity instanceof DummyPlayerEntity dummyPlayer) {
+			dummyPlayer.reloadTextures();
+		}
 	}
 
-	public void toBytes(FriendlyByteBuf buf) {
-		buf.writeInt(id);
-	}
-
-	public static UpdateDummyTexturesMessage fromBytes(FriendlyByteBuf buf) {
-		return new UpdateDummyTexturesMessage(buf.readInt());
-	}
-
-	@SuppressWarnings("resource")
-	public void handle(Supplier<NetworkEvent.Context> ctx) {
-		ctx.get().enqueueWork(() -> {
-			Entity e = Minecraft.getInstance().level.getEntity(id);
-			if (e instanceof DummyPlayerEntity) {
-				((DummyPlayerEntity) e).reloadTextures();
-			}
-		});
-		ctx.get().setPacketHandled(true);
+	@Override
+	public Type<UpdateDummyTexturesMessage> type() {
+		return TYPE;
 	}
 }
